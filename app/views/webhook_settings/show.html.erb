@@ -1,0 +1,64 @@
+<div class="flex flex-wrap space-y-4 md:flex-nowrap md:space-y-0 md:space-x-10">
+  <%= render 'shared/settings_nav' %>
+  <div class="flex-grow">
+    <div class="flex justify-between">
+      <h1 class="text-4xl font-bold mb-4">Webhooks</h1>
+      <%= render 'shared/test_mode_toggle' %>
+    </div>
+    <div class="card bg-base-200">
+      <div class="card-body p-6">
+        <%= form_for @encrypted_config, url: settings_webhooks_path, method: :post, html: { autocomplete: 'off' } do |f| %>
+          <%= f.label :value, 'Webhook URL', class: 'text-sm font-semibold' %>
+          <div class="flex flex-row flex-wrap space-y-2 md:space-y-0 md:flex-nowrap md:space-x-4 mt-2">
+            <%= f.url_field :value, class: 'input font-mono input-bordered w-full', placeholder: 'https://example.com/hook' %>
+            <%= f.button button_title(title: 'Save', disabled_with: 'Saving'), class: 'base-button w-full md:w-32' %>
+          </div>
+        <% end %>
+        <% preference = current_account.account_configs.find_by(key: AccountConfig::WEBHOOK_PREFERENCES_KEY)&.value || {} %>
+        <% WebhookPreferencesController::EVENTS.group_by { |e| e.include?('form') }.each do |_, events| %>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-2 gap-y-2">
+            <% events.each do |event| %>
+              <%= form_for '', url: webhook_preferences_path, method: :post do |f| %>
+                <%= f.hidden_field :event, value: event %>
+                <% uuid = SecureRandom.uuid %>
+                <div class="flex">
+                  <label for="<%= uuid %>" class="flex items-center space-x-2">
+                    <%= f.check_box :value, class: 'base-checkbox', checked: preference[event] || (!preference.key?(event) && event.starts_with?('form.')), onchange: 'this.form.requestSubmit()', id: uuid %>
+                    <span>
+                      <%= event %>
+                    </span>
+                  </label>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    <% submitter = current_account.submitters.where.not(completed_at: nil).order(:id).last %>
+    <% if submitter %>
+      <div class="space-y-4 mt-4">
+        <div class="collapse collapse-open bg-base-200 px-1">
+          <div class="p-4 text-xl font-medium">
+            <div class="flex items-center justify-between">
+              <span>
+                Submission example payload
+              </span>
+              <% if @encrypted_config.value.present? %>
+                <%= button_to button_title(title: 'Test Webhook', disabled_with: 'Sending', icon_disabled: svg_icon('loader', class: 'w-4 h-4 animate-spin')), settings_webhooks_path, class: 'btn btn-neutral btn-outline btn-sm', method: :put %>
+              <% end %>
+            </div>
+          </div>
+          <div class="collapse-content" style="display: inherit">
+            <div class="mockup-code overflow-hidden relative">
+              <span class="top-0 right-0 absolute">
+                <%= render 'shared/clipboard_copy', icon: 'copy', text: code = JSON.pretty_generate({ event_type: 'form.completed', timestamp: Time.current.iso8601, data: Submitters::SerializeForWebhook.call(submitter) }).gsub(/^/, '  ').sub(/^\s+/, ''), class: 'btn btn-ghost text-white', icon_class: 'w-6 h-6 text-white', copy_title: 'Copy', copied_title: 'Copied' %>
+              </span>
+              <pre><code class="overflow-hidden w-full"><%= code %></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

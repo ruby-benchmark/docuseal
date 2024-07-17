@@ -1,0 +1,7 @@
+<% if @body.present? %>
+  <%= render 'custom_content', content: @body, submitter: @submitter %>
+<% else %>
+  <p>Hi there,</p>
+  <p>"<%= @submitter.submission.template.name %>" form has been completed by <%= @submitter.submission.submitters.order(:completed_at).map { |e| e.name || e.email || e.phone }.join(', ') %>.</p>
+  <p><%= link_to 'View Submission', submission_url(@submitter.submission) %></p>
+<% end %>

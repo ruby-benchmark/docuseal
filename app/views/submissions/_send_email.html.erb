@@ -1,0 +1,58 @@
+<div class="form-control">
+  <% can_send_emails = Accounts.can_send_emails?(current_account) %>
+  <div class="flex justify-between items-center">
+    <%= f.label :send_email, for: uuid = SecureRandom.uuid, class: 'flex items-center cursor-pointer' do %>
+      <%= f.check_box :send_email, id: uuid, class: 'base-checkbox', disabled: !can_send_emails, checked: can_send_emails %>
+      <span class="label">Send emails</span>
+    <% end %>
+    <div>
+      <% if can_send_emails %>
+        <label>
+          <%= f.check_box :is_custom_message, onchange: "[this.form.querySelector('#message_field').classList.toggle('hidden', !event.currentTarget.checked)]", checked: false, class: 'hidden peer' %>
+          <span class="link peer-checked:hidden">Edit message</span>
+        </label>
+      <% end %>
+      <%= render 'email_stats' %>
+    </div>
+  </div>
+  <% if !Docuseal.multitenant? && !can_send_emails %>
+    <div class="alert my-4">
+      <%= svg_icon('info_circle', class: 'w-6 h-6') %>
+      <div>
+        <p class="font-bold">SMTP not Configured</p>
+        <p class="text-gray-700">
+          Configure SMTP settings in order to send emails:
+          <br>
+          <a class="link font-medium" data-turbo-frame="_top" href="<%= settings_email_index_path %>">Go to SMTP settings</a>
+        </p>
+      </div>
+    </div>
+  <% end %>
+</div>
+<% config = AccountConfigs.find_or_initialize_for_key(current_account, AccountConfig::SUBMITTER_INVITATION_EMAIL_KEY) %>
+<div id="message_field" class="card card-compact bg-base-200 hidden">
+  <div class="card-body">
+    <div class="form-control space-y-2">
+      <div class="form-control">
+        <%= f.label :subject, class: 'label' %>
+        <%= f.text_field :subject, value: @template.preferences['request_email_subject'].presence || config.value['subject'], required: true, class: '!text-sm base-input w-full', dir: 'auto' %>
+      </div>
+      <div class="form-control">
+        <div class="flex items-center">
+          <%= f.label :message, 'Body', class: 'label' %>
+          <span class="tooltip tooltip-right" data-tip="Use following placeholders text: <%= AccountConfig::DEFAULT_VALUES.dig(AccountConfig::SUBMITTER_INVITATION_EMAIL_KEY, 'body').scan(/{{.*?}}/).join(', ') %>">
+            <%= svg_icon('info_circle', class: 'w-4 h-4') %>
+          </span>
+        </div>
+        <autoresize-textarea>
+          <%= f.text_area :body, value: @template.preferences['request_email_body'].presence || config.value['body'], required: true, class: 'base-textarea w-full', rows: 10, dir: 'auto' %>
+        </autoresize-textarea>
+        <label for="<%= uuid = SecureRandom.uuid %>" class="flex items-center cursor-pointer">
+          <%= check_box_tag :save_message, id: uuid, class: 'base-checkbox', checked: false %>
+          <span class="label">Save as default template message</span>
+        </label>
+      </div>
+      <%= render 'message_fields' %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,110 @@
+<div class="flex flex-wrap space-y-4 md:flex-nowrap md:space-y-0 md:space-x-10">
+  <%= render 'shared/settings_nav' %>
+  <div class="flex-grow">
+    <div class="flex justify-between">
+      <h1 class="text-4xl font-bold mb-4">API</h1>
+      <%= render 'shared/test_mode_toggle' %>
+    </div>
+    <div class="card bg-base-200">
+      <div class="card-body p-6">
+        <label for="api_key" class="text-sm font-semibold">X-Auth-Token</label>
+        <div class="flex flex-col md:flex-row gap-4">
+          <div class="flex w-full space-x-4">
+            <input id="api_key" type="text" value="<%= current_user.access_token.token %>" class="input font-mono input-bordered w-full" autocomplete="off" readonly>
+            <%= render 'shared/clipboard_copy', icon: 'copy', text: current_user.access_token.token, class: 'base-button', icon_class: 'w-6 h-6 text-white', copy_title: 'Copy', copied_title: 'Copied' %>
+          </div>
+          <%= button_to button_title(title: 'Rotate', disabled_with: 'Rotate', icon: svg_icon('reload', class: 'w-6 h-6')), settings_api_index_path, class: 'white-button w-full', data: { turbo_confirm: 'Remove existing API token and generated a new one. Are you sure?' } %>
+        </div>
+      </div>
+    </div>
+    <div class="space-y-4 mt-4">
+      <div class="collapse collapse-plus bg-base-200 px-1">
+        <input type="checkbox">
+        <div class="collapse-title text-xl font-medium">
+          <div>
+            Request signature, multiple submitters with default values
+          </div>
+          <div class="mt-1">
+            <div class="badge badge-warning badge-lg">POST</div>
+            <div class="badge badge-primary badge-lg"><%= api_submissions_path %></div>
+          </div>
+        </div>
+        <div class="collapse-content" style="display: inherit">
+          <div class="mockup-code overflow-hidden">
+            <% text = capture do %>curl --location '<%= api_submissions_url %>' \
+       --header 'X-Auth-Token: <%= current_user.access_token.token %>' \
+       --data-raw '{
+         "template_id": <%= current_account.templates.last&.id || 1 %>,
+         "submitters": [
+           {
+             "name": "John Doe",
+             "role": "<%= current_account.templates.last ? current_account.templates.last.submitters.first['name'] : 'First Party' %>",
+             "email": "<%= current_user.email.sub('@', '+test@') %>",
+             "values": {
+               "Form Text Field Name": "Default Value"
+             }
+           },
+           { "role": "Second Submitter", "email": "<%= current_user.email.sub('@', '+test2@') %>" }
+         ]
+       }'<% end.to_str %>
+            <span class="top-0 right-0 absolute">
+              <%= render 'shared/clipboard_copy', icon: 'copy', text:, class: 'btn btn-ghost text-white', icon_class: 'w-6 h-6 text-white', copy_title: 'Copy', copied_title: 'Copied' %>
+            </span>
+            <pre data-prefix="$"><code class="overflow-hidden w-full"><%= text %></code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="collapse collapse-plus bg-base-200 px-1">
+        <input type="checkbox">
+        <div class="collapse-title text-xl font-medium">
+          <div>
+            Request signature, single submitter
+          </div>
+          <div class="mt-1">
+            <div class="badge badge-warning badge-lg">POST</div>
+            <div class="badge badge-primary badge-lg"><%= api_submissions_emails_path %></div>
+          </div>
+        </div>
+        <div class="collapse-content" style="display: inherit">
+          <div class="mockup-code overflow-hidden">
+            <% text = capture do %>curl --location '<%= api_submissions_emails_url %>' \
+       --header 'X-Auth-Token: <%= current_user.access_token.token %>' \
+       --data-raw '{
+           "template_id": <%= current_account.templates.last&.id || 1 %>,
+           "emails":  "<%= current_user.email.sub('@', '+test@') %>, <%= current_user.email.sub('@', '+test2@') %>"
+       }'<% end.to_str %>
+            <span class="top-0 right-0 absolute">
+              <%= render 'shared/clipboard_copy', icon: 'copy', text:, class: 'btn btn-ghost text-white', icon_class: 'w-6 h-6 text-white', copy_title: 'Copy', copied_title: 'Copied' %>
+            </span>
+            <pre data-prefix="$"><code class="overflow-hidden w-full"><%= text %></code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="collapse collapse-plus bg-base-200 px-1">
+        <input type="checkbox">
+        <div class="collapse-title text-xl font-medium">
+          <div>
+            Template details
+          </div>
+          <div class="mt-1">
+            <div class="badge badge-info badge-lg">GET</div>
+            <div class="badge badge-primary badge-lg"><%= api_template_path(':id') %></div>
+          </div>
+        </div>
+        <div class="collapse-content" style="display: inherit">
+          <div class="mockup-code overflow-hidden">
+            <% text = capture do %>curl '<%= api_template_url(current_account.templates&.last || 1) %>' \
+       --header 'X-Auth-Token: <%= current_user.access_token.token %>'<% end.to_str %>
+            <span class="top-0 right-0 absolute">
+              <%= render 'shared/clipboard_copy', icon: 'copy', text:, class: 'btn btn-ghost text-white', icon_class: 'w-6 h-6 text-white', copy_title: 'Copy', copied_title: 'Copied' %>
+            </span>
+            <pre data-prefix="$"><code class="overflow-hidden w-full"><%= text %></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="text-center">
+      <%= link_to 'Open Full API Reference', "#{Docuseal::PRODUCT_URL}/docs/api", class: 'btn btn-warning text-base mt-4 px-8', target: '_blank', rel: 'noopener' %>
+    </div>
+  </div>
+</div>

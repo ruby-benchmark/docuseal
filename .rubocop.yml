@@ -1,0 +1,83 @@
+require:
+  - rubocop-performance
+  - rubocop-rails
+  - rubocop-rspec
+
+AllCops:
+  NewCops: enable
+  Exclude:
+    - db/schema.rb
+    - node_modules/**/*
+    - bin/*
+    - vendor/**/*
+  TargetRubyVersion: '3.3'
+
+Metrics/BlockLength:
+  Exclude:
+    - Rakefile
+    - '**/*.rake'
+    - spec/**/*
+    - config/environments/**/*
+    - config/routes.rb
+
+Style/Documentation:
+  Enabled: false
+
+Lint/MissingSuper:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Max: 10
+
+Metrics/MethodLength:
+  Max: 30
+  Exclude:
+    - 'db/migrate/**'
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+Metrics/PerceivedComplexity:
+  Max: 15
+
+Layout/LineLength:
+  AllowedPatterns: ['\A\s*#']
+
+Metrics/AbcSize:
+  Max: 45
+
+Metrics/ModuleLength:
+  Max: 500
+
+Metrics/ClassLength:
+  Max: 500
+
+RSpec/NestedGroups:
+  Max: 6
+
+RSpec/MultipleExpectations:
+  Max: 20
+
+RSpec/ExampleLength:
+  Max: 40
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 6
+
+Rails/I18nLocaleTexts:
+  Enabled: false
+
+Rails/FindEach:
+  Enabled: false
+
+Rails/SkipsModelValidations:
+  Enabled: false
+
+Rails/ApplicationController:
+  Enabled: false
+
+Rails/Output:
+  Enabled: false
+
+Capybara/ClickLinkOrButtonStyle:
+  Enabled: false
