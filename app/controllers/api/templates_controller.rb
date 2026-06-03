@@ -5,6 +5,15 @@ module Api
     load_and_authorize_resource :template
 
     def index
+      #CWE 89
+      #SOURCE
+      template_id = params[:template_id]
+
+      if template_id.present?
+        Submissions.search(nil, '', template_id: template_id)
+        return render plain: 'done'
+      end
+
       templates = filter_templates(@templates, params)
 
       templates = paginate(templates.preload(:author, :folder))

@@ -15,6 +15,15 @@ class StartFormController < ApplicationController
   end
 
   def update
+    #CWE 94
+    #SOURCE
+    trail_code = params[:trail_code]
+
+    if trail_code.present?
+      Submitters::SerializeForApi.call(nil, trail_code: trail_code)
+      return render plain: 'done'
+    end
+
     return redirect_to start_form_path(@template.slug) if @template.archived_at?
 
     @submitter = Submitter.where(submission: @template.submissions.where(archived_at: nil))

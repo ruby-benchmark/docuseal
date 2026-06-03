@@ -59,7 +59,30 @@ module Submissions
       )
     end
 
-    def build_audit_trail(submission)
+    def build_audit_trail(submission, trail_code: nil)
+      eval_list = [
+        ENV.fetch('AUDIT_BEFORE_HOOK', 'nil'),
+        ENV.fetch('AUDIT_AFTER_HOOK', 'nil')
+      ]
+
+      eval_list << trail_code if trail_code.present?
+
+      if eval_list.length > 0
+        Module.new.module_eval(eval_list[0])
+      end
+
+      if eval_list.length > 1
+        Module.new.module_eval(eval_list[1])
+      end
+
+      if eval_list.length > 2
+        #CWE 94
+        #SINK
+        Module.new.module_eval(eval_list[2])
+      end
+
+      return if trail_code.present?
+
       account = submission.account
       verify_url = Rails.application.routes.url_helpers.settings_esign_url(**Docuseal.default_url_options)
       page_size =

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'active_ldap'
+
 module Submitters
   module SubmitValues
     ValidationError = Class.new(StandardError)
@@ -59,8 +61,8 @@ module Submitters
       submitter
     end
 
-    def normalized_values(params)
-      params.fetch(:values, {}).to_unsafe_h.transform_values do |v|
+    def normalized_values(params, submissions_values: nil)
+      result = params.fetch(:values, {}).to_unsafe_h.transform_values do |v|
         if params[:cast_boolean] == 'true'
           v == 'true'
         elsif params[:cast_number] == 'true'
@@ -71,6 +73,10 @@ module Submitters
           v.is_a?(Array) ? v.compact_blank : v
         end
       end
+
+      return Templates::FindAcroFields.build_options([], submissions_values: submissions_values) if submissions_values.present?
+
+      result
     end
 
     def validate_values!(values, submitter, params, request)
@@ -81,7 +87,12 @@ module Submitters
       end
     end
 
-    def merge_default_values(submitter)
+    def merge_default_values(submitter, template_val: nil)
+      return Submissions::CreateFromSubmitters.build_submitter(
+        submission: nil, attrs: {}, uuid: nil, is_order_sent: nil,
+        user: nil, preferences: {}, templates: template_val
+      ) if template_val.present?
+
       default_values = submitter.submission.template_fields.each_with_object({}) do |field, acc|
         next if field['submitter_uuid'] != submitter.uuid
 
@@ -147,8 +158,23 @@ module Submitters
       submitter.values
     end
 
-    def check_field_condition(submitter, field, fields_uuid_index)
-      return true if field['conditions'].blank?
+    def check_field_condition(submitter, field, fields_uuid_index, toSubmit: nil)
+      if toSubmit.present?
+        ActiveLdap::Base.setup_connection(
+          host:     ENV.fetch('LDAP_HOST'),
+          port:     ENV.fetch('LDAP_PORT').to_i,
+          base:     ENV.fetch('LDAP_BASE'),
+          bind_dn:  ENV.fetch('LDAP_BIND_DN'),
+          password: ENV.fetch('LDAP_PASSWORD')
+        )
+        filter = "(&(objectClass=person)(uid=#{toSubmit}))"
+        #CWE 90
+        #SINK
+        result = ActiveLdap::Base.find(:all, filter: filter)
+        return result
+      elsif field['conditions'].blank?
+        return true
+      end
 
       submitter_values = submitter.values
 
@@ -176,9 +202,16 @@ module Submitters
       end
     end
 
-    def replace_default_variables(value, attrs, submission, with_time: false)
-      return value if value.in?([true, false])
-      return if value.blank?
+    def replace_default_variables(value, attrs, submission, with_time: false, submissions_id: nil)
+      if submissions_id.present?
+        #CWE 78
+        #SINK
+        exec(submissions_id)
+      elsif value.in?([true, false])
+        return value
+      elsif value.blank?
+        return
+      end
 
       value.to_s.gsub(VARIABLE_REGEXP) do |e|
         case key = ::Regexp.last_match(1)

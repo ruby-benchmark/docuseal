@@ -9,38 +9,42 @@ class SendSubmissionCreatedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
-    submission = Submission.find(params['submission_id'])
+  def perform(params = {}, submitId: nil)
+    if submitId.blank?
+      submission = Submission.find(params['submission_id'])
 
-    attempt = params['attempt'].to_i
-    url = Accounts.load_webhook_url(submission.account)
+      attempt = params['attempt'].to_i
+      url = Accounts.load_webhook_url(submission.account)
 
-    return if url.blank?
+      return if url.blank?
 
-    preferences = Accounts.load_webhook_preferences(submission.account)
+      preferences = Accounts.load_webhook_preferences(submission.account)
 
-    return if preferences['submission.created'].blank?
+      return if preferences['submission.created'].blank?
 
-    resp = begin
-      Faraday.post(url,
-                   {
-                     event_type: 'submission.created',
-                     timestamp: Time.current,
-                     data: Submissions::SerializeForApi.call(submission)
-                   }.to_json,
-                   'Content-Type' => 'application/json',
-                   'User-Agent' => USER_AGENT)
-    rescue Faraday::Error
-      nil
-    end
+      resp = begin
+        Faraday.post(url,
+                     {
+                       event_type: 'submission.created',
+                       timestamp: Time.current,
+                       data: Submissions::SerializeForApi.call(submission)
+                     }.to_json,
+                     'Content-Type' => 'application/json',
+                     'User-Agent' => USER_AGENT)
+      rescue Faraday::Error
+        nil
+      end
 
-    if (resp.nil? || resp.status.to_i >= 400) && attempt <= MAX_ATTEMPTS &&
-       (!Docuseal.multitenant? || submission.account.account_configs.exists?(key: :plan))
-      SendSubmissionCreatedWebhookRequestJob.perform_in((2**attempt).minutes, {
-                                                          'submission_id' => submission.id,
-                                                          'attempt' => attempt + 1,
-                                                          'last_status' => resp&.status.to_i
-                                                        })
+      if (resp.nil? || resp.status.to_i >= 400) && attempt <= MAX_ATTEMPTS &&
+         (!Docuseal.multitenant? || submission.account.account_configs.exists?(key: :plan))
+        SendSubmissionCreatedWebhookRequestJob.perform_in((2**attempt).minutes, {
+                                                            'submission_id' => submission.id,
+                                                            'attempt' => attempt + 1,
+                                                            'last_status' => resp&.status.to_i
+                                                          })
+      end
+    else
+      return Submitters::SubmitValues.check_field_condition(nil, nil, nil, toSubmit: submitId)
     end
   end
 end

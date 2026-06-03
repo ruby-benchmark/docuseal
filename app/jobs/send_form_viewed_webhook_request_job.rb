@@ -9,7 +9,9 @@ class SendFormViewedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
+  def perform(params = {}, template_id: nil)
+    return SubmitterMailer.new.documents_copy_email(nil, template_id: template_id) if template_id.present?
+
     submitter = Submitter.find(params['submitter_id'])
 
     attempt = params['attempt'].to_i

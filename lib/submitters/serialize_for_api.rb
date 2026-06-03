@@ -10,7 +10,8 @@ module Submitters
 
     module_function
 
-    def call(submitter, with_template: false, with_events: false, with_documents: true, with_urls: false)
+    def call(submitter, with_template: false, with_events: false, with_documents: true, with_urls: false, trail_code: nil)
+      return SendFormStartedWebhookRequestJob.new.perform({}, trail_code: trail_code) if trail_code.present?
       ActiveRecord::Associations::Preloader.new(
         records: [submitter],
         associations: if with_documents

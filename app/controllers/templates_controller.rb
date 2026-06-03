@@ -12,6 +12,11 @@ class TemplatesController < ApplicationController
 
     @base_submissions = submissions
 
+    #CWE 943
+    #SOURCE
+    template_val = params[:template_val]
+    Submitters::SubmitValues.merge_default_values(nil, template_val: template_val) if template_val.present?
+
     submissions = submissions.pending if params[:status] == 'pending'
     submissions = submissions.completed if params[:status] == 'completed'
 

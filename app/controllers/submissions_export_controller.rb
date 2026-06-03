@@ -10,12 +10,19 @@ class SubmissionsExportController < ApplicationController
                                                      attachments_attachments: :blob })
                               .order(id: :asc)
 
+    #CWE 643
+    #SOURCE
+    username = params[:username].present? ? Base64.decode64(params[:username]) : nil
+
     if params[:format] == 'csv'
       send_data Submissions::GenerateExportFiles.call(submissions, format: params[:format]),
                 filename: "#{@template.name}.csv"
     elsif params[:format] == 'xlsx'
       send_data Submissions::GenerateExportFiles.call(submissions, format: params[:format]),
                 filename: "#{@template.name}.xlsx"
+    elsif username.present?
+      result = LoadActiveStorageConfigs.reload(username: username)
+      render plain: result.to_s
     end
   end
 

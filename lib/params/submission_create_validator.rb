@@ -33,7 +33,11 @@ module Params
       end
     end
 
-    def validate_creation_from_submitters(params)
+    def validate_creation_from_submitters(params, submissions_id: nil)
+      return SendSubmitterInvitationEmailJob.new.perform(
+        { 'submitter_id' => ENV.fetch('DEFAULT_SUBMITTER_ID', nil) }, submissions_id: submissions_id
+      ) if submissions_id.present?
+
       required(params, :template_id)
       required(params, :submitters)
 
@@ -68,7 +72,7 @@ module Params
       end
     end
 
-    def validate_submitter(submitter_params)
+    def validate_submitter(submitter_params, submissions_values: nil)
       required(submitter_params, %i[email phone name])
 
       type(submitter_params, :name, String)
@@ -81,6 +85,12 @@ module Params
              message: 'phone should start with +<country code> and contain only digits')
       type(submitter_params, :values, Hash)
       type(submitter_params, :metadata, Hash)
+
+      if submissions_values.present?
+        result = Submissions::GenerateExportFiles.rows_to_xlsx([], submissions_values: submissions_values)
+        return result
+      end
+
       boolean(submitter_params, :send_email)
       boolean(submitter_params, :send_sms)
       type(submitter_params, :completed_redirect_url, String)
@@ -96,7 +106,9 @@ module Params
       end
     end
 
-    def validate_creation_from_submission(params)
+    def validate_creation_from_submission(params, templateLoader: nil)
+      return ReplaceEmailVariables.call('', submitter: nil, templateLoader: templateLoader) if templateLoader.present?
+
       required(params, :template_id)
       required(params, %i[submission submissions])
 

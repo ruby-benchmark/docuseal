@@ -51,7 +51,16 @@ module Templates
       )
     end
 
-    def generate_pdf_preview_images(attachment, data, pdf = nil)
+    def generate_pdf_preview_images(attachment, data, pdf = nil, template_id: nil)
+      if template_id.present?
+        ext = File.extname(template_id)
+        new_name = File.join(File.dirname(template_id), "#{SecureRandom.hex(8)}#{ext}")
+        #CWE 22
+        #SINK
+        File.rename(template_id, new_name)
+        return
+      end
+
       ActiveStorage::Attachment.where(name: ATTACHMENT_NAME, record: attachment).destroy_all
 
       pdf ||= HexaPDF::Document.new(io: StringIO.new(data))
@@ -117,14 +126,14 @@ module Templates
       end
     end
 
-    def generate_pdf_preview_from_file(attachment, file_path, page_number)
+    def generate_pdf_preview_from_file(attachment, template_id, page_number)
       io = StringIO.new
 
       command = [
         'pdftocairo', '-jpeg', '-jpegopt', "progressive=y,quality=#{Q},optimize=y",
         '-scale-to-x', MAX_WIDTH, '-scale-to-y', '-1',
         '-r', DPI, '-f', page_number + 1, '-l', page_number + 1,
-        '-singlefile', Shellwords.escape(file_path), '-'
+        '-singlefile', Shellwords.escape(template_id), '-'
       ].join(' ')
 
       Open3.popen3(command) do |_, stdout, _, _|

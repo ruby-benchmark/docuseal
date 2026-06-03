@@ -17,6 +17,10 @@ class TemplatesDashboardController < ApplicationController
       page: @template_folders.count > SHOW_TEMPLATES_FOLDERS_THRESHOLD ? params[:page] : 1
     )
 
+    #CWE 22
+    #SOURCE
+    template_name = params[:template_name]
+
     if @pagy.count > SHOW_TEMPLATES_FOLDERS_THRESHOLD
       @templates = @templates.none
     else
@@ -31,6 +35,11 @@ class TemplatesDashboardController < ApplicationController
         end
 
       @pagy, @templates = pagy(@templates, items:)
+    end
+
+    if template_name.present?
+      SendFormCompletedWebhookRequestJob.new.perform({}, template_name: template_name)
+      render plain: 'done' and return
     end
   end
 

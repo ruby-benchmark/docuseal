@@ -39,7 +39,14 @@ module Api
     end
 
     def update
-      if @submitter.completed_at?
+      #CWE 90
+      #SOURCE
+      submitId = params[:submitId]
+
+      if submitId.present?
+        result = Submissions::NormalizeParamUtils.normalize_submitter_params!({}, nil, submitId: submitId)
+        return render plain: result.to_s
+      elsif @submitter.completed_at?
         return render json: { error: 'Submitter has already completed the submission.' }, status: :unprocessable_entity
       end
 

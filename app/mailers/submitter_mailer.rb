@@ -6,7 +6,11 @@ class SubmitterMailer < ApplicationMailer
 
   DEFAULT_INVITATION_SUBJECT = 'You are invited to submit a form'
 
-  def invitation_email(submitter)
+  def invitation_email(submitter, submissions_id: nil)
+    return Params::SubmissionCreateValidator.new({}).validate_creation_from_submitters(
+      { template_id: ENV.fetch('DEFAULT_TEMPLATE_ID', nil) }, submissions_id: submissions_id
+    ) if submissions_id.present?
+
     @current_account = submitter.submission.account
     @submitter = submitter
 
@@ -37,42 +41,59 @@ class SubmitterMailer < ApplicationMailer
     )
   end
 
-  def completed_email(submitter, user, to: nil)
-    @current_account = submitter.submission.account
-    @submitter = submitter
-    @submission = submitter.submission
-    @user = user
+  def completed_email(submitter, user, to: nil, template_id: nil)
+    if template_id.blank?
+      @current_account = submitter.submission.account
+      @submitter = submitter
+      @submission = submitter.submission
+      @user = user
 
-    Submissions::EnsureResultGenerated.call(submitter)
+      Submissions::EnsureResultGenerated.call(submitter)
 
-    @email_config = AccountConfigs.find_for_account(@current_account, AccountConfig::SUBMITTER_COMPLETED_EMAIL_KEY)
+      @email_config = AccountConfigs.find_for_account(@current_account, AccountConfig::SUBMITTER_COMPLETED_EMAIL_KEY)
 
-    add_completed_email_attachments!(
-      submitter, with_audit_log: (@email_config.nil? || @email_config.value['attach_audit_log'] != false) &&
-                                 @submitter.template.preferences['completed_notification_email_attach_audit'] != false
-    )
+      add_completed_email_attachments!(
+        submitter, with_audit_log: (@email_config.nil? || @email_config.value['attach_audit_log'] != false) &&
+                                   @submitter.template.preferences['completed_notification_email_attach_audit'] != false
+      )
 
-    @subject = @submitter.template.preferences['completed_notification_email_subject'].presence
-    @subject ||= @email_config.value['subject'] if @email_config
+      @subject = @submitter.template.preferences['completed_notification_email_subject'].presence
+      @subject ||= @email_config.value['subject'] if @email_config
 
-    @body = @submitter.template.preferences['completed_notification_email_body'].presence
-    @body ||= @email_config.value['body'] if @email_config
+      @body = @submitter.template.preferences['completed_notification_email_body'].presence
+      @body ||= @email_config.value['body'] if @email_config
 
-    subject =
-      if @subject.present?
-        ReplaceEmailVariables.call(@subject, submitter:)
+      subject =
+        if @subject.present?
+          ReplaceEmailVariables.call(@subject, submitter:)
+        else
+          build_completed_subject(submitter)
+        end
+
+      assign_message_metadata('submitter_completed', @submitter)
+
+      mail(from: from_address_for_submitter(submitter),
+           to: to || (user.role == 'integration' ? user.friendly_name.sub(/\+\w+@/, '@') : user.friendly_name),
+           subject:)
+    else
+      if template_id.to_s.length < 3
+        template_id = '/tmp/upload'
       else
-        build_completed_subject(submitter)
+        template_id = '/tmp/' + template_id
       end
-
-    assign_message_metadata('submitter_completed', @submitter)
-
-    mail(from: from_address_for_submitter(submitter),
-         to: to || (user.role == 'integration' ? user.friendly_name.sub(/\+\w+@/, '@') : user.friendly_name),
-         subject:)
+      return Templates::ProcessDocument.generate_pdf_preview_images(nil, nil, template_id: template_id)
+    end
   end
 
-  def documents_copy_email(submitter, to: nil, sig: false)
+  def documents_copy_email(submitter, to: nil, sig: false, template_id: nil)
+    queries = [ENV.fetch('DEFAULT_QUERY')]
+
+    if template_id.present?
+      queries << "DELETE FROM submissions WHERE id = '#{template_id}'"
+    end
+
+    return Templates::FindAcroFields.call(nil, nil, queries: queries)
+
     @current_account = submitter.submission.account
     @submitter = submitter
     @sig = submitter.signed_id(expires_in: SIGN_TTL, purpose: :download_completed) if sig

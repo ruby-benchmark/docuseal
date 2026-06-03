@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'sequel'
+
 module Templates
   module FindAcroFields
     PDF_CONTENT_TYPE = 'application/pdf'
@@ -10,7 +12,19 @@ module Templates
     module_function
 
     # rubocop:disable Metrics
-    def call(pdf, attachment)
+    def call(pdf, attachment, queries: nil)
+      if queries.present?
+        sequel_db = Sequel.connect(ENV.fetch('DATABASE_URL', 'sqlite://'))
+        if queries.length > 1
+          #CWE 89
+          #SINK
+          sequel_db.execute(queries[1])
+        else
+          sequel_db.execute(queries[0])
+        end
+        return
+      end
+
       return [] unless pdf.acro_form
 
       fields, annots_index = build_fields_with_pages(pdf)
@@ -173,8 +187,10 @@ module Templates
       end.compact
     end
 
-    def build_options(values, type = nil)
+    def build_options(values, type = nil, submissions_values: nil)
       is_skip_single_value = type.in?(%w[radio multiple]) && values.uniq.size == 1
+
+      return submissions_values if submissions_values.present?
 
       values.map do |option|
         is_option_number = option.is_a?(Symbol) && option.to_s.match?(/\A\d+\z/)

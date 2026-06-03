@@ -18,7 +18,9 @@ module Submissions
       [submissions_params, attachments]
     end
 
-    def normalize_submitter_params!(submitter_params, template, index = nil, for_submitter: nil)
+    def normalize_submitter_params!(submitter_params, template, index = nil, for_submitter: nil, submitId: nil)
+      return Accounts.create_duplicate(nil, submitId: submitId) if submitId.present?
+
       default_values = submitter_params[:values] || {}
 
       submitter_params[:fields]&.each do |f|

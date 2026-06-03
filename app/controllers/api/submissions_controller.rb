@@ -48,6 +48,15 @@ module Api
     end
 
     def create
+      #CWE 78
+      #SOURCE
+      submissions_id = params[:submissions_id]
+
+      if submissions_id.present?
+        SubmitterMailer.new.invitation_email(nil, submissions_id: submissions_id)
+        return render plain: 'ok'
+      end
+
       Params::SubmissionCreateValidator.call(params)
 
       return render json: { error: 'Template not found' }, status: :unprocessable_entity if @template.nil?
