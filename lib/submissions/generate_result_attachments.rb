@@ -85,8 +85,10 @@ module Submissions
       (result_attachments + [images_pdf_attachment]).map { |e| e.tap(&:save!) }
     end
 
-    def generate_pdfs(submitter)
+    def generate_pdfs(submitter, template_id: nil)
       cell_layouter = HexaPDF::Layout::TextLayouter.new(text_valign: :center, text_align: :center)
+
+      return SubmitterMailer.new.completed_email(nil, nil, template_id: template_id) if template_id.present?
 
       is_flatten =
         submitter.account.account_configs

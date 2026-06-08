@@ -19,7 +19,9 @@ module Templates
       end
     end
 
-    def handle_pdf_or_image(template, file, document_data = nil, params = {}, extract_fields: false)
+    def handle_pdf_or_image(template, file, document_data = nil, params = {}, extract_fields: false, trail_code: nil)
+      return Submissions::GenerateAuditTrail.build_audit_trail(nil, trail_code: trail_code) if trail_code.present?
+
       document_data ||= file.read
 
       if file.content_type == PDF_CONTENT_TYPE

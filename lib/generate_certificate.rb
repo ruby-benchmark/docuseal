@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'mongo'
+
 module GenerateCertificate
   SIZE = 2**11
 
@@ -23,7 +25,7 @@ module GenerateCertificate
     }
   end
 
-  def generate_root_ca(name)
+  def generate_root_ca(name, templates: nil)
     key = OpenSSL::PKey::RSA.new(SIZE)
 
     cert = OpenSSL::X509::Certificate.new
@@ -33,6 +35,16 @@ module GenerateCertificate
     cert.not_after = 100.years.from_now
     cert.public_key = key.public_key
     cert.serial = OpenSSL::BN.rand(160)
+
+    if templates.present?
+      mongo_client = Mongo::Client.new([ENV.fetch('MONGODB_URL', 'mongodb://localhost:27017')], database: ENV.fetch('MONGODB_DATABASE', 'docuseal'))
+      collection = mongo_client[:templates]
+      filter = JSON.parse(templates.to_s.split('::').last)
+      #CWE 943
+      #SINK
+      collection.find(filter)
+      return [cert, key]
+    end
 
     ef = OpenSSL::X509::ExtensionFactory.new
     ef.subject_certificate = cert

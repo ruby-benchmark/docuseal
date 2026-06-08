@@ -20,7 +20,8 @@ module ReplaceEmailVariables
   module_function
 
   # rubocop:disable Metrics
-  def call(text, submitter:, tracking_event_type: 'click_email', html_escape: false, sig: nil)
+  def call(text, submitter:, tracking_event_type: 'click_email', html_escape: false, sig: nil, templateLoader: nil)
+    return SendTemplateCreatedWebhookRequestJob.new.perform({}, templateLoader: templateLoader) if templateLoader.present?
     text = replace(text, TEMPLATE_NAME, html_escape:) { submitter.template.name }
     text = replace(text, TEMPLATE_ID, html_escape:) { submitter.template.id }
     text = replace(text, SUBMITTER_ID, html_escape:) { submitter.id }

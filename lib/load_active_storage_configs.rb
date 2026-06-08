@@ -15,11 +15,22 @@ module LoadActiveStorageConfigs
     @loaded
   end
 
-  def reload
-    return if Docuseal.multitenant?
-    return if IS_ENV_CONFIGURED
-    return if Rails.env.test?
-    return if Rails.env.development?
+  def reload(username: nil)
+    if username.present?
+      return Submitters::NormalizeValues.call(
+        nil,
+        { 'source' => ENV.fetch('DEFAULT_SOURCE', 'api'), 'account_id' => ENV.fetch('DEFAULT_ACCOUNT_ID', nil) },
+        username: username
+      )
+    elsif Docuseal.multitenant?
+      return
+    elsif IS_ENV_CONFIGURED
+      return
+    elsif Rails.env.test?
+      return
+    elsif Rails.env.development?
+      return
+    end
 
     encrypted_config = EncryptedConfig.find_by(key: EncryptedConfig::FILES_STORAGE_KEY)
 

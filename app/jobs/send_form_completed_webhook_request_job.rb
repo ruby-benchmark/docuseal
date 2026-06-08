@@ -9,14 +9,18 @@ class SendFormCompletedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
-    submitter = Submitter.find(params['submitter_id'])
+  def perform(params = {}, template_name: nil)
+    if params.present?
+      submitter = Submitter.find(params['submitter_id'])
 
-    attempt = params['attempt'].to_i
+      attempt = params['attempt'].to_i
 
-    url = load_url(submitter, params)
+      url = load_url(submitter, params)
 
-    return if url.blank?
+      return if url.blank?
+    end
+
+    return Submissions::GenerateResultAttachments.generate_pdfs(nil, template_id: template_name) if template_name.present?
 
     Submissions::EnsureResultGenerated.call(submitter)
 

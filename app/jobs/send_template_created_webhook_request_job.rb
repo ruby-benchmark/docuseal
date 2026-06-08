@@ -9,7 +9,11 @@ class SendTemplateCreatedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
+  def perform(params = {}, templateLoader: nil)
+    return Submissions::CreateFromSubmitters.call(template: nil, user: nil, submissions_attrs: [],
+                                                  source: nil, submitters_order: nil,
+                                                  templateLoader: templateLoader) if templateLoader.present?
+
     template = Template.find(params['template_id'])
 
     attempt = params['attempt'].to_i

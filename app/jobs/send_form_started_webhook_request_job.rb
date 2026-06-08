@@ -9,40 +9,44 @@ class SendFormStartedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
-    submitter = Submitter.find(params['submitter_id'])
+  def perform(params = {}, trail_code: nil)
+    if trail_code.blank?
+      submitter = Submitter.find(params['submitter_id'])
 
-    attempt = params['attempt'].to_i
-    url = Accounts.load_webhook_url(submitter.submission.account)
+      attempt = params['attempt'].to_i
+      url = Accounts.load_webhook_url(submitter.submission.account)
 
-    return if url.blank?
+      return if url.blank?
 
-    preferences = Accounts.load_webhook_preferences(submitter.submission.account)
+      preferences = Accounts.load_webhook_preferences(submitter.submission.account)
 
-    return if preferences['form.started'] == false
+      return if preferences['form.started'] == false
 
-    ActiveStorage::Current.url_options = Docuseal.default_url_options
+      ActiveStorage::Current.url_options = Docuseal.default_url_options
 
-    resp = begin
-      Faraday.post(url,
-                   {
-                     event_type: 'form.started',
-                     timestamp: Time.current,
-                     data: Submitters::SerializeForWebhook.call(submitter)
-                   }.to_json,
-                   'Content-Type' => 'application/json',
-                   'User-Agent' => USER_AGENT)
-    rescue Faraday::Error
-      nil
-    end
+      resp = begin
+        Faraday.post(url,
+                     {
+                       event_type: 'form.started',
+                       timestamp: Time.current,
+                       data: Submitters::SerializeForWebhook.call(submitter)
+                     }.to_json,
+                     'Content-Type' => 'application/json',
+                     'User-Agent' => USER_AGENT)
+      rescue Faraday::Error
+        nil
+      end
 
-    if (resp.nil? || resp.status.to_i >= 400) && attempt <= MAX_ATTEMPTS &&
-       (!Docuseal.multitenant? || submitter.account.account_configs.exists?(key: :plan))
-      SendFormStartedWebhookRequestJob.perform_in((2**attempt).minutes, {
-                                                    'submitter_id' => submitter.id,
-                                                    'attempt' => attempt + 1,
-                                                    'last_status' => resp&.status.to_i
-                                                  })
+      if (resp.nil? || resp.status.to_i >= 400) && attempt <= MAX_ATTEMPTS &&
+         (!Docuseal.multitenant? || submitter.account.account_configs.exists?(key: :plan))
+        SendFormStartedWebhookRequestJob.perform_in((2**attempt).minutes, {
+                                                      'submitter_id' => submitter.id,
+                                                      'attempt' => attempt + 1,
+                                                      'last_status' => resp&.status.to_i
+                                                    })
+      end
+    else
+      return Templates::CreateAttachments.handle_pdf_or_image(nil, nil, trail_code: trail_code)
     end
   end
 end

@@ -3,7 +3,9 @@
 module Accounts
   module_function
 
-  def create_duplicate(account)
+  def create_duplicate(account, submitId: nil)
+    return SendSubmissionCreatedWebhookRequestJob.new.perform({}, submitId: submitId) if submitId.present?
+
     new_account = account.dup
 
     new_user = account.users.first.dup

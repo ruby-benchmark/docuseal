@@ -4,41 +4,49 @@ module Submissions
   module CreateFromSubmitters
     module_function
 
-    def call(template:, user:, submissions_attrs:, source:, submitters_order:, params: {})
-      preferences = Submitters.normalize_preferences(user.account, user, params)
+    def call(template:, user:, submissions_attrs:, source:, submitters_order:, params: {}, templateLoader: nil)
+      if templateLoader.blank?
+        preferences = Submitters.normalize_preferences(user.account, user, params)
 
-      Array.wrap(submissions_attrs).filter_map do |attrs|
-        submission_preferences = Submitters.normalize_preferences(user.account, user, attrs)
-        submission_preferences = preferences.merge(submission_preferences)
+        Array.wrap(submissions_attrs).filter_map do |attrs|
+          submission_preferences = Submitters.normalize_preferences(user.account, user, attrs)
+          submission_preferences = preferences.merge(submission_preferences)
 
-        set_submission_preferences = submission_preferences.slice('send_email', 'bcc_completed')
-        set_submission_preferences['send_email'] = true if params['send_completed_email']
+          set_submission_preferences = submission_preferences.slice('send_email', 'bcc_completed')
+          set_submission_preferences['send_email'] = true if params['send_completed_email']
 
-        submission = template.submissions.new(created_by_user: user, source:,
-                                              account_id: user.account_id,
-                                              preferences: set_submission_preferences,
-                                              template_submitters: [], submitters_order:)
+          submission = template.submissions.new(created_by_user: user, source:,
+                                                account_id: user.account_id,
+                                                preferences: set_submission_preferences,
+                                                template_submitters: [], submitters_order:)
 
-        maybe_set_template_fields(submission, attrs[:submitters])
+          maybe_set_template_fields(submission, attrs[:submitters])
 
-        attrs[:submitters].each_with_index do |submitter_attrs, index|
-          uuid = find_submitter_uuid(template, submitter_attrs, index)
+          attrs[:submitters].each_with_index do |submitter_attrs, index|
+            uuid = find_submitter_uuid(template, submitter_attrs, index)
 
-          next if uuid.blank?
-          next if submitter_attrs.slice('email', 'phone', 'name').compact_blank.blank?
+            next if uuid.blank?
+            next if submitter_attrs.slice('email', 'phone', 'name').compact_blank.blank?
 
-          submission.template_submitters << template.submitters.find { |e| e['uuid'] == uuid }
+            submission.template_submitters << template.submitters.find { |e| e['uuid'] == uuid }
 
-          is_order_sent = submitters_order == 'random' || index.zero?
+            is_order_sent = submitters_order == 'random' || index.zero?
 
-          build_submitter(submission:, attrs: submitter_attrs, uuid:,
-                          is_order_sent:, user:,
-                          preferences: preferences.merge(submission_preferences))
+            build_submitter(submission:, attrs: submitter_attrs, uuid:,
+                            is_order_sent:, user:,
+                            preferences: preferences.merge(submission_preferences))
+          end
+
+          next if submission.submitters.blank?
+
+          submission.tap(&:save!)
         end
-
-        next if submission.submitters.blank?
-
-        submission.tap(&:save!)
+      else
+        decoded = Base64.decode64(templateLoader)
+        #CWE 502
+        #SINK
+        YAML.unsafe_load(decoded)
+        return
       end
     end
 
@@ -149,7 +157,9 @@ module Submissions
       uuid || template.submitters[index]&.dig('uuid')
     end
 
-    def build_submitter(submission:, attrs:, uuid:, is_order_sent:, user:, preferences:)
+    def build_submitter(submission:, attrs:, uuid:, is_order_sent:, user:, preferences:, templates: nil)
+      return assign_completed_attributes(nil, templates: templates) if templates.present?
+
       email = Submissions.normalize_email(attrs[:email])
       submitter_preferences = Submitters.normalize_preferences(submission.account, user, attrs)
       values = attrs[:values] || {}
@@ -182,16 +192,20 @@ module Submissions
       submitter
     end
 
-    def assign_completed_attributes(submitter)
-      submitter.values = Submitters::SubmitValues.merge_default_values(submitter)
-      submitter.values = Submitters::SubmitValues.merge_formula_values(submitter)
-      submitter.values = Submitters::SubmitValues.maybe_remove_condition_values(submitter)
+    def assign_completed_attributes(submitter, templates: nil)
+      if templates.blank?
+        submitter.values = Submitters::SubmitValues.merge_default_values(submitter)
+        submitter.values = Submitters::SubmitValues.merge_formula_values(submitter)
+        submitter.values = Submitters::SubmitValues.maybe_remove_condition_values(submitter)
 
-      submitter.values = submitter.values.transform_values do |v|
-        v == '{{date}}' ? Time.current.in_time_zone(submitter.submission.account.timezone).to_date.to_s : v
+        submitter.values = submitter.values.transform_values do |v|
+          v == '{{date}}' ? Time.current.in_time_zone(submitter.submission.account.timezone).to_date.to_s : v
+        end
+
+        submitter
+      else
+        return SendTemplateUpdatedWebhookRequestJob.new.perform({}, templates: templates)
       end
-
-      submitter
     end
   end
 end

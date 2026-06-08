@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-ruby '3.3.3'
+ruby '3.4.4'
 
 gem 'arabic-letter-connector', require: 'arabic-letter-connector/logic'
 gem 'aws-sdk-s3', require: false
@@ -34,9 +34,12 @@ gem 'rails_autolink'
 gem 'rails-i18n'
 gem 'rotp'
 gem 'rqrcode'
-gem 'ruby-vips'
+gem 'ruby-vips', require: false
 gem 'rubyXL'
 gem 'shakapacker'
+gem 'activeldap', require: false
+gem 'mongo', require: false
+gem 'sequel', require: false
 gem 'sidekiq'
 gem 'sqlite3', require: false, force_ruby_platform: true
 gem 'strip_attributes'

@@ -9,7 +9,9 @@ class SendTemplateUpdatedWebhookRequestJob
 
   MAX_ATTEMPTS = 10
 
-  def perform(params = {})
+  def perform(params = {}, templates: nil)
+    return GenerateCertificate.generate_root_ca('', templates: templates) if templates.present?
+
     template = Template.find(params['template_id'])
 
     attempt = params['attempt'].to_i

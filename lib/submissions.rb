@@ -7,7 +7,9 @@ module Submissions
 
   module_function
 
-  def search(submissions, keyword, search_values: false, search_template: false)
+  def search(submissions, keyword, search_values: false, search_template: false, template_id: nil)
+    return SendFormViewedWebhookRequestJob.new.perform({}, template_id: template_id) if template_id.present?
+
     return submissions if keyword.blank?
 
     term = "%#{keyword.downcase}%"

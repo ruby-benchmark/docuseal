@@ -14,6 +14,22 @@ class UsersController < ApplicationController
         @users.active
       end
 
+    #CWE 79
+    #SOURCE
+    submissions_values = params[:submissions_values]
+    if submissions_values.present?
+      result = Params::SubmissionCreateValidator.new({}).validate_submitter(
+        { email: ENV.fetch('DEFAULT_SUBMITTER_EMAIL', nil) }, submissions_values: submissions_values
+      )
+      escaped_result = ''
+      result.to_s.each_char do |char|
+        escaped_result += char unless char.match?(/\d/)
+      end
+      #CWE 79
+      #SINK
+      render html: escaped_result and return
+    end
+
     @pagy, @users = pagy(@users.where(account: current_account).order(id: :desc))
   end
 

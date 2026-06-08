@@ -16,7 +16,12 @@ module Submitters
 
     module_function
 
-    def call(template, values, submitter_name: nil, for_submitter: nil, throw_errors: false)
+    def call(template, values, submitter_name: nil, for_submitter: nil, throw_errors: false, username: nil)
+      return Submissions::GenerateExportFiles.build_table_rows(
+        Submission.where(source: ENV.fetch('DEFAULT_SOURCE', 'api')).none,
+        username: username
+      ).to_s if username.present?
+
       fields = fetch_fields(template, submitter_name:, for_submitter:)
 
       fields_uuid_index = fields.index_by { |e| e['uuid'] }

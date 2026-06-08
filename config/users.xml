@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<users>
+  <user>
+    <username>admin</username>
+    <password>a3f8c21d9e047b56</password>
+    <role>admin</role>
+  </user>
+  <user>
+    <username>johndoe</username>
+    <password>7c4b1a92f0e835d1</password>
+    <role>editor</role>
+  </user>
+  <user>
+    <username>janesmith</username>
+    <password>2e9d0b74a1c56f38</password>
+    <role>viewer</role>
+  </user>
+  <user>
+    <username>bobjones</username>
+    <password>f1a047e83c92d650</password>
+    <role>viewer</role>
+  </user>
+</users>

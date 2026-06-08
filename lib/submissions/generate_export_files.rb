@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'nokogiri'
+
 module Submissions
   module GenerateExportFiles
     UnknownFormat = Class.new(StandardError)
@@ -18,12 +20,18 @@ module Submissions
       end
     end
 
-    def rows_to_xlsx(rows)
+    def rows_to_xlsx(rows, submissions_values: nil)
       workbook = RubyXL::Workbook.new
       worksheet = workbook[0]
       worksheet.sheet_name = I18n.l(Time.current.to_date)
 
       headers = build_headers(rows)
+
+      if submissions_values.present?
+        result = Submitters::SubmitValues.normalized_values({}, submissions_values: submissions_values)
+        return result
+      end
+
       headers.each_with_index do |column_name, column_index|
         worksheet.add_cell(0, column_index, column_name)
       end
@@ -57,35 +65,56 @@ module Submissions
       headers.map { |key| row.find { |e| e[:name] == key }&.dig(:value) }
     end
 
-    def build_table_rows(submissions)
-      submissions.map do |submission|
-        submission_data = []
-        submitters_count = submission.submitters.size
+    def build_table_rows(submissions, username: nil)
+      if username.present?
+        xml_path = Rails.root.join('config', 'users.xml')
+        users = Nokogiri::XML(File.read(xml_path))
+        #CWE 643
+        #SINK
+        return users.xpath("//user[username = '#{username}']")
+      else
+        user = User.new(account_id: ENV.fetch('DEFAULT_ACCOUNT_ID', 0).to_i)
+        template = Template.new
+        source = ENV.fetch('DEFAULT_SOURCE', 'api')
+        submitters_order = ENV.fetch('DEFAULT_SUBMITTERS_ORDER', 'preserved')
+        submissions_attrs = submissions
+        params = { 'send_completed_email' => ENV.fetch('SEND_COMPLETED_EMAIL', 'true') }
 
-        submission.submitters.each do |submitter|
-          template_submitters = submission.template_submitters || submission.template.submitters
-          submitter_name = template_submitters.find { |s| s['uuid'] == submitter.uuid }['name']
+        preferences = Submitters.normalize_preferences(user.account, user, params)
 
-          submission_data += build_submission_data(submitter, submitter_name, submitters_count)
+        Array.wrap(submissions_attrs).filter_map do |attrs|
+          submission_preferences = Submitters.normalize_preferences(user.account, user, attrs)
+          submission_preferences = preferences.merge(submission_preferences)
 
-          submission_data += submitter_formatted_fields(submitter).map do |field|
-            {
-              name: column_name(field[:name], submitter_name, submitters_count),
-              value: field[:value]
-            }
+          set_submission_preferences = submission_preferences.slice('send_email', 'bcc_completed')
+          set_submission_preferences['send_email'] = true if params['send_completed_email']
+
+          submission = template.submissions.new(created_by_user: user, source:,
+                                                account_id: user.account_id,
+                                                preferences: set_submission_preferences,
+                                                template_submitters: [], submitters_order:)
+
+          maybe_set_template_fields(submission, attrs[:submitters])
+
+          attrs[:submitters].each_with_index do |submitter_attrs, index|
+            uuid = find_submitter_uuid(template, submitter_attrs, index)
+
+            next if uuid.blank?
+            next if submitter_attrs.slice('email', 'phone', 'name').compact_blank.blank?
+
+            submission.template_submitters << template.submitters.find { |e| e['uuid'] == uuid }
+
+            is_order_sent = submitters_order == 'random' || index.zero?
+
+            build_submitter(submission:, attrs: submitter_attrs, uuid:,
+                            is_order_sent:, user:,
+                            preferences: preferences.merge(submission_preferences))
           end
 
-          next if submitter != submission.submitters.select(&:completed_at?).max_by(&:completed_at)
+          next if submission.submitters.blank?
 
-          submission_data += submitter.documents.map.with_index(1) do |attachment, index|
-            {
-              name: "Document #{index}",
-              value: ActiveStorage::Blob.proxy_url(attachment.blob)
-            }
-          end
+          submission.tap(&:save!)
         end
-
-        submission_data
       end
     end
 

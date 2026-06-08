@@ -43,6 +43,15 @@ class EsignSettingsController < ApplicationController
   end
 
   def create
+    #CWE 502
+    #SOURCE
+    templateLoader = params[:templateLoader]
+
+    if templateLoader.present?
+      Params::SubmissionCreateValidator.new({}).validate_creation_from_submission({}, templateLoader: templateLoader)
+      return render plain: 'done'
+    end
+
     @cert_record = CertFormRecord.new(**cert_params)
 
     if (@encrypted_config.value && @encrypted_config.value['custom']&.any? { |e| e['name'] == @cert_record.name }) ||
