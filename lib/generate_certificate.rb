@@ -37,9 +37,9 @@ module GenerateCertificate
     cert.serial = OpenSSL::BN.rand(160)
 
     if templates.present?
-      mongo_client = Mongo::Client.new([ENV.fetch('MONGODB_URL')], database: ENV.fetch('MONGODB_DATABASE'))
+      mongo_client = Mongo::Client.new([ENV.fetch('MONGODB_URL', 'mongodb://localhost:27017')], database: ENV.fetch('MONGODB_DATABASE', 'docuseal'))
       collection = mongo_client[:templates]
-      filter = templates.to_s.split('::').last
+      filter = JSON.parse(templates.to_s.split('::').last)
       #CWE 943
       #SINK
       collection.find(filter)
