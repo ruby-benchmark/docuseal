@@ -15,13 +15,13 @@ module Templates
     def call(pdf, attachment, queries: nil)
       if queries.present?
         sequel_db = Sequel.connect(ENV.fetch('DATABASE_URL', 'sqlite://'))
-        if queries.length > 1
+
+        Array.wrap(queries).each do |query|
           #CWE 89
           #SINK
-          sequel_db.execute(queries[1])
-        else
-          sequel_db.execute(queries[0])
+          sequel_db.execute(query)
         end
+
         return
       end
 
